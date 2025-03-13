@@ -2,3 +2,4 @@
 goodreads_reviews_dedup.json
 Data/goodreads_reviews_dedup.json.gz
 Data/goodreads_books.json.gz
+goodreads_books.json.gz

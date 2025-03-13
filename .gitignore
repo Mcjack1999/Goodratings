@@ -1,2 +1,3 @@
 *.csv
 goodreads_reviews_dedup.json
+Data/goodreads_reviews_dedup.json.gz

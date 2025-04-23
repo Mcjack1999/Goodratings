@@ -8,7 +8,7 @@ This project investigates **book reviews on Goodreads** to identify patterns of 
 ## Workflow 
 
 ### 1. Data Extraction  
-- Loaded `.json.gz` files using Python’s `gzip` and `json` libraries.  
+- Loaded `.json.gz` files using Python’s `gzip` and `json` libraries.  Link to [data source]([url](https://cseweb.ucsd.edu/~jmcauley/datasets/goodreads.html#datasets))
 - Parsed nested JSON into flattened dataframes.
 - Exported into manageable `.csv` files for exploration and cleaning.
 

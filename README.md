@@ -1,7 +1,9 @@
 # 📚 Goodreads, Bad Ratings 
 
 ## Overview  
-This project investigates **book reviews on Goodreads** to identify patterns of user dissatisfaction. Using a combination of review and book metadata, the aim is to explore how reader sentiment diverges from official book descriptions and set the stage for a future **sentiment analysis** pipeline.
+What makes a book polarizing? This project explores the most disliked titles on Goodreads by analyzing over 15 million records of metadata and reader reviews. Using a two-phase approach—first with structured numerical data and then full-text review analysis—I examine the patterns behind one-star ratings, from genre bias to mismatched expectations and recurring complaint themes. The result is a rich combination of data storytelling, text mining, and visual interpretation that surfaces what readers love to hate—and why.
+
+Negative reviews offer a rich, if often blunt, form of feedback. By focusing on one-star reviews—often emotionally charged and thematically rich—this project surfaces common patterns of disappointment and explores how reader expectations collide with genre, style, and content. This exploration serves as both a cultural critique and a foundation for more advanced modeling of user sentiment and experience.
 
 ---
 

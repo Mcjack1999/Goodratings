@@ -9,6 +9,69 @@ Negative reviews offer a rich, if often blunt, form of feedback. By focusing on 
 
 ## Workflow 
 
+### Proof of Concept: Exploratory Analysis on Numerical Metadata
+
+Before working with the full-text UCSD dataset, I conducted a preliminary analysis using a structured-only dataset from Hugging Face. This dataset contained book-level metadata (e.g., average star ratings, review counts, genres) but no full review text. This separate notebook and data source allowed me to develop and validate early hypotheses about patterns in dissatisfaction and prepare the logic for downstream tasks.
+
+#### Key Goals
+
+* Practice parsing, cleaning, and reshaping complex nested fields
+* Visualize genre-level review patterns and star distributions
+* Determine whether genre bias or engagement issues appeared in low-rated books
+
+#### Key Cleaning and Feature Engineering Steps
+
+```python
+import ast  # Parse JSON-like strings to dict
+
+# Convert 'community_reviews' from string to dictionary
+sample_df['community_reviews'] = sample_df['community_reviews'].apply(
+    lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+
+# Extract 1-star review counts and percentages
+sample_df['1_star_reviews_num'] = sample_df['community_reviews'].apply(
+    lambda x: x['1_stars']['reviews_num'] if isinstance(x, dict) else 0)
+sample_df['1_star_reviews_percentage'] = sample_df['community_reviews'].apply(
+    lambda x: x['1_stars']['reviews_percentage'] if isinstance(x, dict) else 0)
+
+# Parse genres
+sample_df['genres'] = sample_df['genres'].apply(
+    lambda x: ast.literal_eval(x) if isinstance(x, str) else [])
+
+# Explode genres to one-per-row
+sample_df = sample_df.explode('genres')
+
+# Repeat above steps for 2–5 star review counts/percentages...
+```
+
+#### Exploratory Visualizations
+
+1. **Top 20 Most Common Genres**
+   Identified the most frequent genres in the dataset (excluding 'NaN').
+
+   ```python
+   genre_counts = sample_df['genres'].value_counts().head(20)
+   sns.barplot(x=genre_counts.values, y=genre_counts.index)
+   ```
+
+2. **Genres with the Highest % of 1-Star Reviews**
+   Averaged 1-star review percentages per genre to detect genre-based dissatisfaction.
+
+3. **Number of Ratings vs. Star Rating**
+   Scatterplot using log scale to investigate whether popularity correlates with positivity.
+
+4. **Distribution of Star Ratings**
+   Showed overall shape of rating spread (mostly skewed right).
+
+5. **Correlation Matrix**
+   Correlated key metrics (e.g., number of reviews, 1-star %s) to explore hidden relationships.
+
+#### Outcome
+
+This lightweight, metadata-driven exploration revealed early patterns: genres like romance and fantasy showed the most polarization, while average rating was not always a good predictor of satisfaction. These findings helped shape my final decision to focus on 1-star reviews and build a review-theme tagging system.
+
+> ⚠️ Note: This work was done on a different dataset from Hugging Face and in a separate notebook. It did not feed into the full-text review pipeline but served as a critical methodological sandbox.
+
 ### 1. Data Extraction  
 - Loaded `.json.gz` files using Python’s `gzip` and `json` libraries.  Link to [data source]([url](https://cseweb.ucsd.edu/~jmcauley/datasets/goodreads.html#datasets))
 - Parsed nested JSON into flattened dataframes.

@@ -268,7 +268,7 @@ plt.grid(False)
 plt.show()
 ```
 
-📊 See: ![When Were the Most 1-Star Rated Books Published?](Graphs/when-were-most-1star-reviews.jpg)
+📊 See: ![When Were the Most 1-Star Rated Books Published?](Graphs/when-were-most-1star-reviews_published.jpg)
 
 Takeaway:
 There was a notable spike in 1-star-reviewed books between 2011 and 2013. While the cause isn’t definitive, it may reflect Goodreads platform growth, shifting reader expectations, or changes in how books were marketed during that period.

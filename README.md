@@ -11,7 +11,13 @@ Negative reviews offer a rich, if often blunt, form of feedback. By focusing on 
 
 ### Goodreads_concept: Exploratory Analysis on Numerical Metadata
 
-Before working with the full-text UCSD dataset, I conducted a preliminary analysis using a structured-only dataset from [HuggingFace](path). This dataset contained book-level metadata (e.g., average star ratings, review counts, genres) but no full review text. This separate notebook and data source allowed me to develop and validate early hypotheses about patterns in dissatisfaction and prepare the logic for downstream tasks.
+Before working with the full-text UCSD dataset, I conducted a preliminary analysis using a dataset from Hugging Face. This dataset, available at [BrightData/Goodreads-Books](https://huggingface.co/datasets/BrightData/Goodreads-Books), contains book-level metadata such as:
+	•	Average star ratings
+	•	Community review breakdowns
+	•	Genre tags
+	•	Review and rating counts
+
+Although this dataset lacks full-text reviews, it allowed me to prototype feature engineering steps, identify genre-level dissatisfaction trends, and validate early hypotheses about user engagement.
 
 #### Key Goals
 

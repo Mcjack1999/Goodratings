@@ -9,9 +9,9 @@ Negative reviews offer a rich, if often blunt, form of feedback. By focusing on 
 
 ## Workflow 
 
-### Proof of Concept: Exploratory Analysis on Numerical Metadata
+### Goodreads_concept: Exploratory Analysis on Numerical Metadata
 
-Before working with the full-text UCSD dataset, I conducted a preliminary analysis using a structured-only dataset from Hugging Face. This dataset contained book-level metadata (e.g., average star ratings, review counts, genres) but no full review text. This separate notebook and data source allowed me to develop and validate early hypotheses about patterns in dissatisfaction and prepare the logic for downstream tasks.
+Before working with the full-text UCSD dataset, I conducted a preliminary analysis using a structured-only dataset from [HuggingFace](path). This dataset contained book-level metadata (e.g., average star ratings, review counts, genres) but no full review text. This separate notebook and data source allowed me to develop and validate early hypotheses about patterns in dissatisfaction and prepare the logic for downstream tasks.
 
 #### Key Goals
 
@@ -72,99 +72,221 @@ This lightweight, metadata-driven exploration revealed early patterns: genres li
 
 > ⚠️ Note: This work was done on a different dataset from Hugging Face and in a separate notebook. It did not feed into the full-text review pipeline but served as a critical methodological sandbox.
 
-### 1. Data Extraction  
-- Loaded `.json.gz` files using Python’s `gzip` and `json` libraries.  Link to [data source]([url](https://cseweb.ucsd.edu/~jmcauley/datasets/goodreads.html#datasets))
-- Parsed nested JSON into flattened dataframes.
-- Exported into manageable `.csv` files for exploration and cleaning.
+⸻
 
-**df_reviews** 
+### Phase 1: Full Review + Metadata Extraction (UCSD Goodreads Dataset)
 
-	import pandas as pd
-	import json
-	import gzip
+After validating core patterns through earlier metadata exploration (Goodreads_concept), I moved to the full 15+ million review dataset provided by UCSD. This dataset offered both structured book metadata and full review text, allowing me to scale up my analysis and begin natural language-based pattern detection.
 
-	chunk_size= 10000
-	chunks= []
+1. Data Extraction and Transformation
 
-	with gzip.open ("./Data/goodreads_reviews_dedup.json.gz", "rt", encoding="utf-8") as f:
-   		 for i, line in enumerate(f): #read line by line
-      		  chunks.append(json.loads(line)) #convert json to dict
+The raw data was stored in .json.gz format and needed to be parsed line-by-line due to size. I used Python’s gzip and json libraries to iteratively load the data and write it to a flat CSV file in chunks:
 
-    #every chuck line, process data to write csv
+```python
+import gzip, json
+import pandas as pd
+
+chunk_size = 10000
+chunks = []
+
+with gzip.open("./Data/goodreads_reviews_dedup.json.gz", "rt", encoding="utf-8") as f:
+    for i, line in enumerate(f):
+        chunks.append(json.loads(line))
         if (i + 1) % chunk_size == 0:
             df_chunk = pd.DataFrame(chunks)
-            df_chunk.to_csv("goodreads_reviews", mode="a", index= False, header = (i < chunk_size))
+            df_chunk.to_csv("goodreads_reviews.csv", mode="a", index=False, header=(i < chunk_size))
             chunks = []
-        
-	if chunks:
- 	   df_chunk = pd.DataFrame(chunks)
- 	   df_chunk.to_csv("goodreads_reviews", mode ="a", index=False, header=False) 
-    
-### 2. Data Cleaning & Preprocessing  
-#### Merging  
-Merged `reviews` and `books` datasets on `book_id`:
 
-	df_merged = df_reviews.merge(df_books, on="book_id", how="inner")
+    # Final batch
+    if chunks:
+        df_chunk = pd.DataFrame(chunks)
+        df_chunk.to_csv("goodreads_reviews.csv", mode="a", index=False, header=False)
+```
+This process was repeated for goodreads_books.json.gz, and the two resulting DataFrames were merged on the book_id key.
 
-Column Reduction
+2. Cleaning and Preprocessing
 
-Dropped redundant or irrelevant columns to reduce noise and optimize memory usage:
+The merged dataset contained a wide range of features, many of which were irrelevant for my text-focused analysis. I dropped unnecessary fields to reduce noise and optimize performance, particularly for memory management.
 
-	df_merged = df_merged.drop(columns=[
-	    'user_id', 'date_added', 'read_at', 'started_at', 'date_updated',
-	    'kindle_asin', 'work_id', 'n_comments', 'asin', 'similar_books',
-	    'publication_month', 'publication_day', 'edition_information', 'is_ebook'
-	])
+```python
+df_merged = df_reviews.merge(df_books, on="book_id", how="inner")
+df_merged = df_merged.drop(columns=[
+    'user_id', 'date_added', 'read_at', 'started_at', 'date_updated',
+    'kindle_asin', 'work_id', 'n_comments', 'asin', 'similar_books',
+    'publication_month', 'publication_day', 'edition_information', 'is_ebook'
+])
+df_merged = df_merged.dropna(subset=['review_text', 'description'])
+```
 
-Duplicate & Null Checks
-	•	Verified no duplicate review IDs
-	•	Dropped rows missing review_text or description
+Due to the large size of the full dataset (~30GB), I split the data into separate CSV files by star rating for more efficient downstream processing:
 
-	df_merged = df_merged.dropna(subset=['review_text', 'description'])
+```python
+for star in range(0, 6):
+    df_star = df_merged[df_merged['rating'] == star]
+    df_star.to_csv(f"./Data/{star}star_reviews.csv", index=False)
+```
+This modular approach made it easier to focus on specific subsets—in this case, I narrowed in on 1-star reviews, for now because the file size was small enough to work on from my laptop.
 
+Perfect. Let’s outline and enhance Phase 2: Text-Based Theme Extraction and Review Classification, using your workflow and code from earlier.
 
+⸻
 
-3. Data Subsetting
+Phase 2: Text-Based Theme Extraction and Review Classification (1-Star Sample)
 
-To better manage the large dataset (~30GB), data was split by star rating (0–5):
+This phase focuses on understanding why readers leave 1-star reviews by identifying recurring complaint themes in full-text review data. To ensure scalability, I used a 10,000-record sample (sample_1star) from the cleaned 1-star reviews CSV.
 
-	for star in range(0, 6):
-   	 df_star = df_merged[df_merged['rating'] == star]
-   	 df_star.to_csv(f"./Data/{star}star_reviews.csv")
+⸻
 
-Example load and inspection:
+1. Initial Theme Assignment: Rule-Based Keyword Matching
 
-	df_5star = pd.read_csv("./Data/5star_reviews.csv")
-	df_5star.info()
+To create interpretable categories for complaint analysis, I developed a dictionary of complaint themes, where each theme was associated with a list of indicative keywords.
 
+```python
+complaint_themes = {
+    "Plot/Structure": ["slow", "boring", "drag", "confusing", "predictable"],
+    "Character Issues": ["unlikeable", "flat", "annoying", "underdeveloped"],
+    "Writing Style": ["cringe", "pretentious", "badly written"],
+    "Expectations vs Reality": ["overhyped", "disappointed", "expected more"],
+    ...
+}
+```
+A custom assign_themes() function applied this dictionary to the cleaned review text, tagging each review with one or more relevant complaint themes.
+
+```python
+sample_1star['complaint_themes'] = sample_1star['review_clean'].apply(assign_themes)
+```
 
 
 ⸻
 
-Exploratory Focus
-	•	Targeting 1-star reviews to identify trends in dissatisfaction
-	•	Planning genre scraping via Goodreads URLs to enhance metadata
-	•	Laying the groundwork for NLP-driven sentiment analysis and future predictive modeling
+2. Topic Discovery with NMF for Uncategorized Reviews
+
+Reviews not matched to any theme were labeled “Uncategorized”. To improve theme coverage, I applied Non-negative Matrix Factorization (NMF) to those reviews. The process:
+	•	Preprocessed reviews with lemmatization and stopword removal (combining NLTK, WordCloud, and custom lists).
+	•	Vectorized text using TfidfVectorizer with n-grams (1–3).
+	•	Trained a 7-topic NMF model to uncover common latent themes.
+```python
+nmf_model_uncat = NMF(n_components=7, random_state=42, max_iter=300)
+nmf_model_uncat.fit(tfidf_matrix_uncat)
+```
+I interpreted the top words from each topic to expand and refine my original complaint_themes dictionary.
 
 ⸻
+
+3. Updated Theme Assignment and Simplification
+
+With a new and more comprehensive dictionary (complaint_themes_updated), I re-ran the theme assignment logic:
+```python
+sample_1star['complaint_themes_updated'] = sample_1star['review_clean'].apply(assign_themes_updated)
+```
+To enable simpler visualizations, I also created a top_theme column that extracts the first theme from each review’s list:
+```python
+sample_1star['top_theme'] = sample_1star['complaint_themes_updated'].apply(lambda x: x[0] if isinstance(x, list) and x else 'Uncategorized')
+```
+This allows each review to be visualized by a primary complaint category, even when multiple issues are present.
+
+⸻
+
+4. Visualizing Theme Frequency and Distribution
+
+To surface macro trends in reader dissatisfaction, I created several visualizations:
+	•	Bar chart of most common complaint themes
+	•	Scatterplots showing how themes intersect with average Goodreads ratings and ratings count
+	•	Theme breakdowns over time, genre, and publisher (planned)
+
+Each chart used a custom Set2-style palette for visual accessibility and clarity.
+```python
+theme_palette = {
+    'Engagement': '#66c2a5',
+    'Plot/Structure': '#fc8d62',
+    'Character Issues': '#8da0cb',
+    ...
+}
+```
+
+⸻
+
+Exploratory Questions and Key Insight
+
+With the refined complaint_themes_updated and top_theme columns, I began addressing high-level research questions around dissatisfaction patterns in Goodreads reviews:
+
+Research Questions:
+	•	What are the most common reasons people leave 1-star reviews?
+	•	How do complaint themes differ across genres, publishers, and time periods?
+	•	Do some books receive high average ratings despite negative feedback?
+	•	How often do official book descriptions contradict user sentiment?
+	•	When were the most 1-star reviewed books published?
+
+⸻
+
+Featured Insight: When Were the Most 1-Star Rated Books Published?
+
+To explore how review trends evolved over time, I visualized the number of books receiving 1-star reviews by their publication year.
+```python
+# Filter for valid publication years
+sample_1star_clean = sample_1star[(sample_1star['publication_year'] >= 1990) & 
+                                  (sample_1star['publication_year'] <= 2018)]
+
+# Count and fill missing years
+year_range = list(range(1990, 2018))
+year_counts = sample_1star_clean['publication_year'].value_counts().sort_index()
+year_counts = year_counts.reindex(year_range, fill_value=0)
+
+
+# Highlight spike years
+highlight_years = [2011, 2012, 2013]
+colors = ['orange' if year in highlight_years else 'gray' for year in year_counts.index]
+
+# Plot
+plt.figure(figsize=(14, 6))
+bars = plt.bar(year_counts.index, year_counts.values, color=colors)
+
+# Label spike years
+for bar in bars:
+    year = int(bar.get_x() + bar.get_width() / 2)
+    height = bar.get_height()
+    if year in highlight_years:
+        plt.text(bar.get_x() + bar.get_width() / 2, height + 5,
+                 f'{int(height)}', ha='center', va='bottom', fontsize=10, weight='bold')
+
+plt.title("When Were the Most 1-Star Rated Books Published?", fontsize=16, weight='bold')
+plt.xlabel("Publication Year")
+plt.ylabel("Number of 1-Star Reviews")
+plt.xticks(year_range, rotation=45, fontsize=9)
+plt.ylim(0, year_counts.max() + 80)
+plt.figtext(0.5, -0.05,
+            "Note: Spike between 2011–2013 may reflect changes in Goodreads review activity or publishing trends.",
+            wrap=True, horizontalalignment='center', fontsize=10)
+plt.tight_layout()
+plt.grid(False)
+plt.show()
+```
+
+📊 See: [when_were_1star_reviews_published.jpg](path)
+
+Takeaway:
+There was a notable spike in 1-star-reviewed books between 2011 and 2013. While the cause isn’t definitive, it may reflect Goodreads platform growth, shifting reader expectations, or changes in how books were marketed during that period.
+
 
 File Structure
-
 goodreads-bad-ratings/
 │
 ├── Data/
-│   ├── 0star_reviews.csv
 │   ├── 1star_reviews.csv
-│   └── ... through 5star_reviews.csv
+│   ├── cleaned_numerical_data_only.csv  # Phase 0
+│   ├── (Other .csvs for star ratings excluded via .gitignore)
 │
 ├── notebooks/
-│   └── Goodreads.ipynb
+│   ├── Goodreads_concept.ipynb          # Phase 0: Metadata-only EDA
+│   ├── goodreads_sample1star.ipynb      # Sample review text analysis (10k)
+│   └── Goodreads.ipynb                  # Full pipeline for 15M+ dataset
 │
+├── README.md
+├── themes_1star_reviews.jpg             # Example visualization
+└── other_figures/                       # Visual exports for portfolio
 
 
-Notes
-	•	The dataset is very large, so chunking by rating is necessary for smoother computation.
-	•	Genre data is incomplete – scraping in progress using Goodreads book URLs.
-	•	This README will be updated with results from text analysis, sentiment modeling, and visualizations later in the semester.
+Next Steps & Limitations
+This project currently focuses on 1-star reviews and theme detection in a 10k-sample dataset. Genre scraping and full dataset analysis are in progress. Due to dataset size, star rating chunking was required. Results may evolve with full-scale modeling.
 
 
